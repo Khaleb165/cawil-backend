@@ -27,7 +27,7 @@
     },
     {
       "name": "test",
-      "version": "1.31.2",
+      "version": "1.31.1",
       "dependencies": [
         "analyzer",
         "async",
@@ -253,7 +253,7 @@
     },
     {
       "name": "test_core",
-      "version": "0.6.19",
+      "version": "0.6.18",
       "dependencies": [
         "analyzer",
         "args",
@@ -280,7 +280,7 @@
     },
     {
       "name": "test_api",
-      "version": "0.7.13",
+      "version": "0.7.12",
       "dependencies": [
         "async",
         "boolean_selector",
@@ -449,7 +449,7 @@
     },
     {
       "name": "analyzer",
-      "version": "13.3.0",
+      "version": "10.0.1",
       "dependencies": [
         "_fe_analyzer_shared",
         "collection",
@@ -508,12 +508,12 @@
     },
     {
       "name": "meta",
-      "version": "1.19.0",
+      "version": "1.17.0",
       "dependencies": []
     },
     {
       "name": "dart_style",
-      "version": "3.1.10",
+      "version": "3.1.7",
       "dependencies": [
         "analyzer",
         "args",
@@ -644,7 +644,7 @@
     },
     {
       "name": "vector_math",
-      "version": "2.4.0",
+      "version": "2.2.0",
       "dependencies": []
     },
     {
@@ -809,9 +809,10 @@
     },
     {
       "name": "_fe_analyzer_shared",
-      "version": "103.0.0",
+      "version": "93.0.0",
       "dependencies": [
-        "meta"
+        "meta",
+        "source_span"
       ]
     },
     {

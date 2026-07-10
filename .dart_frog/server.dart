@@ -1,0 +1,100 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, implicit_dynamic_list_literal
+
+import 'dart:io';
+
+import 'package:dart_frog/dart_frog.dart';
+
+
+import '../routes/index.dart' as index;
+import '../routes/schedules/index.dart' as schedules_index;
+import '../routes/schedules/[id].dart' as schedules_$id;
+import '../routes/docs/spec.dart' as docs_spec;
+import '../routes/docs/index.dart' as docs_index;
+import '../routes/bookings/index.dart' as bookings_index;
+import '../routes/bookings/[id].dart' as bookings_$id;
+import '../routes/auth/register.dart' as auth_register;
+import '../routes/auth/refresh.dart' as auth_refresh;
+import '../routes/auth/me.dart' as auth_me;
+import '../routes/auth/login.dart' as auth_login;
+import '../routes/admin/route-defs/index.dart' as admin_route_defs_index;
+import '../routes/admin/route-defs/[id].dart' as admin_route_defs_$id;
+import '../routes/admin/buses/index.dart' as admin_buses_index;
+import '../routes/admin/buses/[id].dart' as admin_buses_$id;
+
+import '../routes/_middleware.dart' as middleware;
+import '../routes/admin/_middleware.dart' as admin_middleware;
+
+void main() async {
+  final address = InternetAddress.tryParse('') ?? InternetAddress.anyIPv6;
+  final port = int.tryParse(Platform.environment['PORT'] ?? '8080') ?? 8080;
+  hotReload(() => createServer(address, port));
+}
+
+Future<HttpServer> createServer(InternetAddress address, int port) {
+  final handler = Cascade().add(buildRootHandler()).handler;
+  return serve(handler, address, port);
+}
+
+Handler buildRootHandler() {
+  final pipeline = const Pipeline().addMiddleware(middleware.middleware);
+  final router = Router()
+    ..mount('/', (context) => buildHandler()(context))
+    ..mount('/schedules', (context) => buildSchedulesHandler()(context))
+    ..mount('/docs', (context) => buildDocsHandler()(context))
+    ..mount('/bookings', (context) => buildBookingsHandler()(context))
+    ..mount('/auth', (context) => buildAuthHandler()(context))
+    ..mount('/admin/route-defs', (context) => buildAdminRouteDefsHandler()(context))
+    ..mount('/admin/buses', (context) => buildAdminBusesHandler()(context));
+  return pipeline.addHandler(router);
+}
+
+Handler buildHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/', (context) => index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildSchedulesHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/<id>', (context,id,) => schedules_$id.onRequest(context,id,))..all('/', (context) => schedules_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildDocsHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/spec', (context) => docs_spec.onRequest(context,))..all('/', (context) => docs_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildBookingsHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/<id>', (context,id,) => bookings_$id.onRequest(context,id,))..all('/', (context) => bookings_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildAuthHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/login', (context) => auth_login.onRequest(context,))..all('/me', (context) => auth_me.onRequest(context,))..all('/refresh', (context) => auth_refresh.onRequest(context,))..all('/register', (context) => auth_register.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildAdminRouteDefsHandler() {
+  final pipeline = const Pipeline().addMiddleware(admin_middleware.middleware);
+  final router = Router()
+    ..all('/<id>', (context,id,) => admin_route_defs_$id.onRequest(context,id,))..all('/', (context) => admin_route_defs_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildAdminBusesHandler() {
+  final pipeline = const Pipeline().addMiddleware(admin_middleware.middleware);
+  final router = Router()
+    ..all('/<id>', (context,id,) => admin_buses_$id.onRequest(context,id,))..all('/', (context) => admin_buses_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+

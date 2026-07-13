@@ -159,6 +159,7 @@ const openapiSpec = r'''
           "destination": {"type": "string"},
           "departure_time": {"type": "string", "format": "date-time"},
           "arrival_time": {"type": "string", "format": "date-time", "nullable": true},
+          "report_time": {"type": "string", "format": "date-time", "nullable": true},
           "price": {"type": "number"},
           "seats_remaining": {"type": "integer"},
           "status": {"type": "string", "enum": ["active", "inactive", "departed"]}
@@ -175,6 +176,18 @@ const openapiSpec = r'''
               "total_seats": {"type": "integer"}
             }
           }
+        }
+      },
+      "CreateScheduleRequest": {
+        "type": "object",
+        "required": ["bus_id", "route_id", "departure_time"],
+        "properties": {
+          "bus_id": {"type": "integer"},
+          "route_id": {"type": "integer"},
+          "departure_time": {"type": "string", "format": "date-time"},
+          "arrival_time": {"type": "string", "format": "date-time", "nullable": true},
+          "price": {"type": "number", "minimum": 0, "description": "Optional override. Defaults to the route base_price."},
+          "seats_remaining": {"type": "integer", "minimum": 0, "maximum": 64, "description": "Optional override. Defaults to the bus total_seats."}
         }
       },
       "UpdateScheduleRequest": {
@@ -664,6 +677,82 @@ const openapiSpec = r'''
         }
       }
     },
+    "/admin/schedules": {
+      "get": {
+        "summary": "List schedules (admin only)",
+        "operationId": "adminListSchedules",
+        "tags": ["Admin - Schedules"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by origin city"
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by destination city"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {"type": "string", "format": "date"},
+            "description": "Filter by departure date (YYYY-MM-DD)"
+          },
+          {
+            "name": "bus_id",
+            "in": "query",
+            "schema": {"type": "integer"},
+            "description": "Filter by specific bus"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of schedules with bus info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {"$ref": "#/components/schemas/ScheduleWithBus"}
+                }
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      },
+      "post": {
+        "summary": "Create a schedule (admin only)",
+        "operationId": "createSchedule",
+        "tags": ["Admin - Schedules"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/CreateScheduleRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Schedule created",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ScheduleWithBus"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      }
+    },
     "/schedules": {
       "get": {
         "summary": "Search schedules by origin, destination, and/or date",
@@ -884,6 +973,7 @@ const openapiSpec = r'''
     {"name": "Authentication", "description": "Auth endpoints (register, login, refresh, profile)"},
     {"name": "Admin - Buses", "description": "Bus fleet management (admin only)"},
     {"name": "Admin - Routes", "description": "Route corridor management (admin only)"},
+    {"name": "Admin - Schedules", "description": "Schedule creation and management (admin only)"},
     {"name": "Schedules", "description": "Schedule search and availability"},
     {"name": "Bookings", "description": "Booking creation and management"}
   ]

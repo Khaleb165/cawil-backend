@@ -603,6 +603,52 @@ Future<List<ScheduleSchema>> searchSchedules(
   return rows.map((row) => ScheduleSchema.fromRowWithBus(row)).toList();
 }
 
+Future<ScheduleSchema> createSchedule(
+  CaWilDatabase db, {
+  required int busId,
+  required int routeId,
+  required DateTime departureTime,
+  DateTime? arrivalTime,
+  double? price,
+  int? seatsRemaining,
+}) async {
+  final bus = await getBusById(db, busId);
+  if (bus == null) {
+    throw ArgumentError('Bus not found');
+  }
+
+  final route = await getRouteById(db, routeId);
+  if (route == null) {
+    throw ArgumentError('Route not found');
+  }
+
+  final schedulePrice = price ?? route.basePrice ?? 0;
+  final remainingSeats = _clampInt(seatsRemaining ?? bus.totalSeats, 0, 64);
+
+  final row = await db.queryOne(
+    'INSERT INTO schedules (bus_id, route_id, origin, destination, '
+    'departure_time, arrival_time, price, seats_remaining, status) '
+    "VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, 'active') "
+    'RETURNING id, bus_id, route_id, origin, destination, departure_time, '
+    'arrival_time, report_time, price, seats_remaining, status, created_at, '
+    '(SELECT bus_number FROM buses WHERE id = \$1), '
+    '(SELECT total_seats FROM buses WHERE id = \$1)',
+    [
+      busId,
+      routeId,
+      route.origin,
+      route.destination,
+      departureTime.toUtc(),
+      arrivalTime?.toUtc(),
+      schedulePrice,
+      remainingSeats,
+    ],
+  );
+
+  if (row == null) throw StateError('Failed to create schedule');
+  return ScheduleSchema.fromRowWithBus(row);
+}
+
 Future<ScheduleSchema?> getScheduleById(CaWilDatabase db, int id) async {
   final row = await db.queryOne(
     'SELECT s.id, s.bus_id, s.route_id, s.origin, s.destination, '

@@ -12,7 +12,7 @@ import '../routes/schedules/[id].dart' as schedules_$id;
 import '../routes/docs/spec.dart' as docs_spec;
 import '../routes/docs/index.dart' as docs_index;
 import '../routes/bookings/index.dart' as bookings_index;
-import '../routes/bookings/[id].dart' as bookings_$id;
+import '../routes/bookings/[id]/index.dart' as bookings_$id_index;
 import '../routes/auth/register.dart' as auth_register;
 import '../routes/auth/refresh.dart' as auth_refresh;
 import '../routes/auth/me.dart' as auth_me;
@@ -43,6 +43,7 @@ Handler buildRootHandler() {
     ..mount('/schedules', (context) => buildSchedulesHandler()(context))
     ..mount('/docs', (context) => buildDocsHandler()(context))
     ..mount('/bookings', (context) => buildBookingsHandler()(context))
+    ..mount('/bookings/<id>', (context,id,) => buildBookings$idHandler(id,)(context))
     ..mount('/auth', (context) => buildAuthHandler()(context))
     ..mount('/admin/route-defs', (context) => buildAdminRouteDefsHandler()(context))
     ..mount('/admin/buses', (context) => buildAdminBusesHandler()(context));
@@ -73,7 +74,14 @@ Handler buildDocsHandler() {
 Handler buildBookingsHandler() {
   final pipeline = const Pipeline();
   final router = Router()
-    ..all('/<id>', (context,id,) => bookings_$id.onRequest(context,id,))..all('/', (context) => bookings_index.onRequest(context,));
+    ..all('/', (context) => bookings_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildBookings$idHandler(String id,) {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/', (context) => bookings_$id_index.onRequest(context,id,));
   return pipeline.addHandler(router);
 }
 

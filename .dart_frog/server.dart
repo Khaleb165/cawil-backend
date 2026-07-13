@@ -21,6 +21,7 @@ import '../routes/admin/route-defs/index.dart' as admin_route_defs_index;
 import '../routes/admin/route-defs/[id].dart' as admin_route_defs_$id;
 import '../routes/admin/buses/index.dart' as admin_buses_index;
 import '../routes/admin/buses/[id].dart' as admin_buses_$id;
+import '../routes/admin/schedules/index.dart' as admin_schedules_index;
 
 import '../routes/_middleware.dart' as middleware;
 import '../routes/admin/_middleware.dart' as admin_middleware;
@@ -46,7 +47,8 @@ Handler buildRootHandler() {
     ..mount('/bookings/<id>', (context,id,) => buildBookings$idHandler(id,)(context))
     ..mount('/auth', (context) => buildAuthHandler()(context))
     ..mount('/admin/route-defs', (context) => buildAdminRouteDefsHandler()(context))
-    ..mount('/admin/buses', (context) => buildAdminBusesHandler()(context));
+    ..mount('/admin/buses', (context) => buildAdminBusesHandler()(context))
+    ..mount('/admin/schedules', (context) => buildAdminSchedulesHandler()(context));
   return pipeline.addHandler(router);
 }
 
@@ -103,6 +105,13 @@ Handler buildAdminBusesHandler() {
   final pipeline = const Pipeline().addMiddleware(admin_middleware.middleware);
   final router = Router()
     ..all('/<id>', (context,id,) => admin_buses_$id.onRequest(context,id,))..all('/', (context) => admin_buses_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildAdminSchedulesHandler() {
+  final pipeline = const Pipeline().addMiddleware(admin_middleware.middleware);
+  final router = Router()
+    ..all('/', (context) => admin_schedules_index.onRequest(context,));
   return pipeline.addHandler(router);
 }
 

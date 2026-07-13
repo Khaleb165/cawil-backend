@@ -13,6 +13,22 @@ String? dbNullableString(Object? value, String fieldName) {
   return dbString(value, fieldName);
 }
 
+double dbDouble(Object? value, String fieldName) {
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final parsed = double.tryParse(value);
+    if (parsed != null) return parsed;
+  }
+  throw StateError(
+    'Expected $fieldName to be a number, got ${value.runtimeType}',
+  );
+}
+
+double? dbNullableDouble(Object? value, String fieldName) {
+  if (value == null) return null;
+  return dbDouble(value, fieldName);
+}
+
 class UserSchema {
   final int id;
   final String? uid;
@@ -122,8 +138,8 @@ class RouteSchema {
         id: (row[0] as num).toInt(),
         origin: dbString(row[1], 'routes.origin'),
         destination: dbString(row[2], 'routes.destination'),
-        durationHours: (row[3] as num?)?.toDouble(),
-        basePrice: (row[4] as num?)?.toDouble(),
+        durationHours: dbNullableDouble(row[3], 'routes.duration_hours'),
+        basePrice: dbNullableDouble(row[4], 'routes.base_price'),
         status: dbString(row[5], 'routes.status'),
         createdAt: (row[6] as DateTime).toUtc(),
         updatedAt: (row[7] as DateTime).toUtc(),
@@ -147,6 +163,7 @@ class ScheduleSchema {
   final String destination;
   final DateTime departureTime;
   final DateTime? arrivalTime;
+  final DateTime? reportTime;
   final double price;
   final int seatsRemaining;
   final String status;
@@ -161,6 +178,7 @@ class ScheduleSchema {
     required this.destination,
     required this.departureTime,
     this.arrivalTime,
+    this.reportTime,
     required this.price,
     required this.seatsRemaining,
     required this.status,
@@ -176,7 +194,8 @@ class ScheduleSchema {
         destination: dbString(row[4], 'schedules.destination'),
         departureTime: (row[5] as DateTime).toUtc(),
         arrivalTime: row[6] == null ? null : (row[6] as DateTime).toUtc(),
-        price: (row[8] as num).toDouble(),
+        reportTime: row[7] == null ? null : (row[7] as DateTime).toUtc(),
+        price: dbDouble(row[8], 'schedules.price'),
         seatsRemaining: (row[9] as num).toInt(),
         status: dbString(row[10], 'schedules.status'),
         busNumber: dbNullableString(row[12], 'buses.bus_number'),
@@ -191,6 +210,8 @@ class ScheduleSchema {
       'origin': origin,
       'destination': destination,
       'departure_time': departureTime.toUtc().toIso8601String(),
+      'arrival_time': arrivalTime?.toUtc().toIso8601String(),
+      'report_time': reportTime?.toUtc().toIso8601String(),
       'price': price,
       'seats_remaining': seatsRemaining,
       'status': status,
@@ -240,7 +261,7 @@ class BookingSchema {
         seatNumber: dbString(row[3], 'bookings.seat_number'),
         passengerName: dbString(row[4], 'bookings.passenger_name'),
         phone: dbString(row[5], 'bookings.phone'),
-        totalPrice: (row[6] as num).toDouble(),
+        totalPrice: dbDouble(row[6], 'bookings.total_price'),
         bookingRef: dbString(row[7], 'bookings.booking_ref'),
         qrData: row[8] is List<int> ? row[8] as List<int> : <int>[],
         status: dbString(row[9], 'bookings.status'),

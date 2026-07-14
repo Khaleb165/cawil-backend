@@ -29,6 +29,17 @@ double? dbNullableDouble(Object? value, String fieldName) {
   return dbDouble(value, fieldName);
 }
 
+List<String> dbCommaSeparatedStrings(Object? value, String fieldName) {
+  if (value == null) return const [];
+  final raw = dbString(value, fieldName);
+  if (raw.trim().isEmpty) return const [];
+  return raw
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
 class UserSchema {
   final int id;
   final String? uid;
@@ -169,6 +180,7 @@ class ScheduleSchema {
   final String status;
   final String? busNumber;
   final int? totalSeats;
+  final List<String> bookedSeats;
 
   const ScheduleSchema({
     required this.id,
@@ -184,6 +196,7 @@ class ScheduleSchema {
     required this.status,
     this.busNumber,
     this.totalSeats,
+    this.bookedSeats = const [],
   });
 
   factory ScheduleSchema.fromRowWithBus(List<Object?> row) => ScheduleSchema(
@@ -200,6 +213,7 @@ class ScheduleSchema {
         status: dbString(row[10], 'schedules.status'),
         busNumber: dbNullableString(row[12], 'buses.bus_number'),
         totalSeats: row[13] == null ? null : (row[13] as num).toInt(),
+        bookedSeats: dbCommaSeparatedStrings(row[14], 'bookings.seat_number'),
       );
 
   Map<String, dynamic> toJson({bool includeBus = true}) {
@@ -214,6 +228,7 @@ class ScheduleSchema {
       'report_time': reportTime?.toUtc().toIso8601String(),
       'price': price,
       'seats_remaining': seatsRemaining,
+      'booked_seats': bookedSeats,
       'status': status,
     };
     if (includeBus) {
@@ -227,8 +242,8 @@ class BookingSchema {
   final int id;
   final int userId;
   final int scheduleId;
-  final String seatNumber;
-  final String passengerName;
+  final List<String> seatNumbers;
+  final String contactPerson;
   final String phone;
   final double totalPrice;
   final String bookingRef;
@@ -242,8 +257,8 @@ class BookingSchema {
     required this.id,
     required this.userId,
     required this.scheduleId,
-    required this.seatNumber,
-    required this.passengerName,
+    required this.seatNumbers,
+    required this.contactPerson,
     required this.phone,
     required this.totalPrice,
     required this.bookingRef,
@@ -258,8 +273,8 @@ class BookingSchema {
         id: (row[0] as num).toInt(),
         userId: (row[1] as num).toInt(),
         scheduleId: (row[2] as num).toInt(),
-        seatNumber: dbString(row[3], 'bookings.seat_number'),
-        passengerName: dbString(row[4], 'bookings.passenger_name'),
+        seatNumbers: dbCommaSeparatedStrings(row[17], 'bookings.seat_number'),
+        contactPerson: dbString(row[4], 'bookings.contact_person'),
         phone: dbString(row[5], 'bookings.phone'),
         totalPrice: dbDouble(row[6], 'bookings.total_price'),
         bookingRef: dbString(row[7], 'bookings.booking_ref'),
@@ -267,15 +282,15 @@ class BookingSchema {
         status: dbString(row[9], 'bookings.status'),
         paymentStatus: dbString(row[10], 'bookings.payment_status'),
         email: dbNullableString(row[12], 'users.email'),
-        busNumber: dbNullableString(row[14], 'buses.bus_number'),
+        busNumber: dbNullableString(row[13], 'buses.bus_number'),
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'user_id': userId,
         'schedule_id': scheduleId,
-        'seat_number': seatNumber,
-        'passenger_name': passengerName,
+        'seat_numbers': seatNumbers,
+        'contact_person': contactPerson,
         'phone': phone,
         'total_price': totalPrice,
         'booking_ref': bookingRef,

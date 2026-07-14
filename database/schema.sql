@@ -139,15 +139,47 @@ create table if not exists bookings (
     user_id           int not null references users(id) on delete cascade,
     schedule_id       int not null references schedules(id) on delete cascade,
     seat_number       varchar not null check(length(seat_number) > 0 and length(seat_number) <= 4),
-    passenger_name    varchar not null check(length(passenger_name) > 0 and length(passenger_name) <= 100),
+    contact_person    varchar not null check(length(contact_person) > 0 and length(contact_person) <= 100),
     phone             varchar not null check(length(phone) > 0 and length(phone) <= 20),
     total_price       decimal(10,2) check(total_price >= 0),
-    booking_ref       varchar unique not null check(length(booking_ref) > 0 and length(booking_ref) <= 20),
+    booking_ref       varchar not null check(length(booking_ref) > 0 and length(booking_ref) <= 20),
     qr_data           bytea not null default '\x', -- PDF blob stored here
     status            booking_status default 'confirmed',
     payment_status    paymentstatus default 'pending',
     created_at        timestamptz default now()
 );
+
+alter table bookings add column if not exists contact_person varchar;
+
+do $$
+begin
+    if exists (
+        select 1
+        from information_schema.columns
+        where table_schema = current_schema()
+          and table_name = 'bookings'
+          and column_name = 'passenger_name'
+    ) then
+        update bookings
+        set contact_person = passenger_name
+        where contact_person is null and passenger_name is not null;
+
+        alter table bookings alter column passenger_name drop not null;
+    end if;
+
+    update bookings
+    set contact_person = 'Unknown'
+    where contact_person is null or length(contact_person) = 0;
+
+    alter table bookings alter column contact_person set not null;
+    alter table bookings drop constraint if exists bookings_booking_ref_key;
+end $$;
+
+drop index if exists bookings_booking_ref_key;
+create index if not exists bookings_booking_ref_index on bookings(booking_ref);
+create unique index if not exists bookings_confirmed_schedule_seat_unique
+on bookings(schedule_id, seat_number)
+where status = 'confirmed';
 
 -- ============================================
 -- Schema 6: refresh_tokens (single-use JWT refresh)

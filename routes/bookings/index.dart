@@ -90,9 +90,6 @@ List<String> _parseSeatNumbers(Map<String, dynamic> body) {
 }
 
 Map<String, dynamic>? _getAuthPayload(RequestContext context) {
-  final authHeader = context.request.headers['authorization'];
-  if (authHeader == null || !authHeader.startsWith('Bearer ')) return null;
-  final token = authHeader.substring(7);
   final secret = Platform.environment['JWT_SECRET'] ?? 'dev-secret';
-  return verifyJwt(token, secret);
+  return verifyBearerToken(context.request.headers, secret);
 }

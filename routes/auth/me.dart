@@ -26,12 +26,8 @@ Future<Response> onRequest(RequestContext context) async {
 }
 
 Map<String, dynamic>? _getAuthPayload(RequestContext context) {
-  final authHeader = context.request.headers['authorization'];
-  if (authHeader == null || !authHeader.startsWith('Bearer ')) return null;
-  final token = authHeader.substring(7);
-  final secret =
-      Platform.environment['JWT_SECRET'] ?? 'dev-secret';
-  return verifyJwt(token, secret);
+  final secret = Platform.environment['JWT_SECRET'] ?? 'dev-secret';
+  return verifyBearerToken(context.request.headers, secret);
 }
 
 Future<Response> _getProfile(
@@ -49,8 +45,7 @@ Future<Response> _getProfile(
 
 Future<Response> _updateProfile(
     RequestContext context, Map<String, dynamic> payload) async {
-  final body = jsonDecode(await context.request.body())
-      as Map<String, dynamic>;
+  final body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
 
   final username = body['username'] as String?;
   final avatarUrl = body['avatar_url'] as String?;

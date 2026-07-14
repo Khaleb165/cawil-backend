@@ -50,8 +50,7 @@ Future<Response> _updateSchedule(RequestContext context, int id) async {
     return jsonError(403, 'Admin access required');
   }
 
-  final body =
-      jsonDecode(await context.request.body()) as Map<String, dynamic>;
+  final body = jsonDecode(await context.request.body()) as Map<String, dynamic>;
 
   final seatsRemaining = body['seats_remaining'] as int?;
   if (seatsRemaining == null) {
@@ -85,10 +84,6 @@ Future<Response> _updateSchedule(RequestContext context, int id) async {
 }
 
 Map<String, dynamic>? _getAuthPayload(RequestContext context) {
-  final authHeader = context.request.headers['authorization'];
-  if (authHeader == null || !authHeader.startsWith('Bearer ')) return null;
-  final token = authHeader.substring(7);
-  final secret =
-      Platform.environment['JWT_SECRET'] ?? 'dev-secret';
-  return verifyJwt(token, secret);
+  final secret = Platform.environment['JWT_SECRET'] ?? 'dev-secret';
+  return verifyBearerToken(context.request.headers, secret);
 }

@@ -30,8 +30,9 @@ Map<String, dynamic>? verifyJwt(String token, String secret) {
 
     if (expectedSig != parts[2]) return null;
 
-    final payload = jsonDecode(utf8.decode(base64Url.decode(parts[1])))
-        as Map<String, dynamic>;
+    final payload = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    ) as Map<String, dynamic>;
 
     final exp = payload['exp'] as int?;
     if (exp != null && DateTime.now().millisecondsSinceEpoch ~/ 1000 > exp) {
@@ -42,4 +43,33 @@ Map<String, dynamic>? verifyJwt(String token, String secret) {
   } catch (_) {
     return null;
   }
+}
+
+String? bearerTokenFromHeaders(Map<String, String> headers) {
+  var authHeader = headers['authorization'] ?? headers['Authorization'];
+  if (authHeader == null) {
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'authorization') {
+        authHeader = entry.value;
+        break;
+      }
+    }
+  }
+
+  if (authHeader == null) return null;
+
+  final parts = authHeader.trim().split(RegExp(r'\s+'));
+  if (parts.length != 2 || parts.first.toLowerCase() != 'bearer') {
+    return null;
+  }
+  return parts.last;
+}
+
+Map<String, dynamic>? verifyBearerToken(
+  Map<String, String> headers,
+  String secret,
+) {
+  final token = bearerTokenFromHeaders(headers);
+  if (token == null) return null;
+  return verifyJwt(token, secret);
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:postgres/postgres.dart';
 import 'schemas.dart';
 export 'schemas.dart';
@@ -264,6 +265,17 @@ int _clampInt(int value, int minVal, int maxVal) {
   if (value < minVal) return minVal;
   if (value > maxVal) return maxVal;
   return value;
+}
+
+List<double> _splitPrice(double totalPrice, int parts) {
+  final totalCents = (totalPrice * 100).round();
+  final baseCents = totalCents ~/ parts;
+  var remainder = totalCents % parts;
+  return List<double>.generate(parts, (_) {
+    final cents = baseCents + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder--;
+    return cents / 100;
+  }, growable: false);
 }
 
 // ====================================================================
@@ -565,7 +577,10 @@ Future<List<ScheduleSchema>> searchSchedules(
   var sql = 'SELECT s.id, s.bus_id, s.route_id, s.origin, s.destination, '
       's.departure_time, s.arrival_time, s.report_time, s.price, '
       's.seats_remaining, s.status, s.created_at, '
-      'b.bus_number, b.total_seats '
+      'b.bus_number, b.total_seats, '
+      "COALESCE((SELECT string_agg(bk.seat_number, ',' ORDER BY bk.seat_number) "
+      'FROM bookings bk '
+      "WHERE bk.schedule_id = s.id AND bk.status = 'confirmed'), '') "
       'FROM schedules s '
       'JOIN buses b ON s.bus_id = b.id '
       "WHERE s.status = 'active' ";
@@ -632,7 +647,7 @@ Future<ScheduleSchema> createSchedule(
     'RETURNING id, bus_id, route_id, origin, destination, departure_time, '
     'arrival_time, report_time, price, seats_remaining, status, created_at, '
     '(SELECT bus_number FROM buses WHERE id = \$1), '
-    '(SELECT total_seats FROM buses WHERE id = \$1)',
+    "(SELECT total_seats FROM buses WHERE id = \$1), ''",
     [
       busId,
       routeId,
@@ -653,7 +668,10 @@ Future<ScheduleSchema?> getScheduleById(CaWilDatabase db, int id) async {
   final row = await db.queryOne(
     'SELECT s.id, s.bus_id, s.route_id, s.origin, s.destination, '
     's.departure_time, s.arrival_time, s.report_time, s.price, '
-    's.seats_remaining, s.status, s.created_at, b.bus_number, b.total_seats '
+    's.seats_remaining, s.status, s.created_at, b.bus_number, b.total_seats, '
+    "COALESCE((SELECT string_agg(bk.seat_number, ',' ORDER BY bk.seat_number) "
+    'FROM bookings bk '
+    "WHERE bk.schedule_id = s.id AND bk.status = 'confirmed'), '') "
     'FROM schedules s JOIN buses b ON s.bus_id = b.id WHERE s.id = \$1',
     [id],
   );
@@ -679,56 +697,106 @@ Future<Map<String, dynamic>> createBooking(
   CaWilDatabase db, {
   required int userId,
   required int scheduleId,
-  required String seatNumber,
-  required String passengerName,
+  required List<String> seatNumbers,
+  required String contactPerson,
   required String phone,
   required double totalPrice,
 }) async {
-  final avail = await db.queryOne(
-    'SELECT seats_remaining FROM schedules WHERE id = \$1 FOR UPDATE',
-    [scheduleId],
-  );
-
-  if (avail == null) throw ArgumentError('Schedule not found');
-
-  final currentSeats = (avail[0] as num).toInt();
-  if (currentSeats <= 0) {
-    throw StateError('No seats available for this schedule');
+  if (seatNumbers.isEmpty) {
+    throw ArgumentError('At least one seat number is required');
   }
 
+  final cleanedSeatNumbers =
+      seatNumbers.map((seat) => seat.trim()).toList(growable: false);
+
+  if (cleanedSeatNumbers.any((seat) => seat.isEmpty || seat.length > 4)) {
+    throw ArgumentError('Seat numbers must be 1-4 characters');
+  }
+
+  final uniqueSeatNumbers = cleanedSeatNumbers.toSet().toList(growable: false);
+
+  if (uniqueSeatNumbers.length != cleanedSeatNumbers.length) {
+    throw ArgumentError('Seat numbers must be unique');
+  }
+
+  final safeContactPerson = _truncateTrimmed(contactPerson, 100);
+  final safePhone = _truncateTrimmed(phone, 20);
   final bookingRef = generateBookingRef();
+  final insertedIds = <int>[];
+  final seatPrices = _splitPrice(totalPrice, uniqueSeatNumbers.length);
 
-  await db.query(
-    "INSERT INTO bookings (user_id, schedule_id, seat_number, passenger_name, phone, total_price, booking_ref, status, payment_status) VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, 'confirmed', 'pending')",
-    [
-      userId,
-      scheduleId,
-      seatNumber,
-      _truncate(passengerName, 100),
-      _truncate(phone, 20),
-      totalPrice,
-      bookingRef,
-    ],
-  );
+  await db.query('BEGIN');
+  try {
+    final avail = await db.queryOne(
+      'SELECT seats_remaining FROM schedules WHERE id = \$1 FOR UPDATE',
+      [scheduleId],
+    );
 
-  await db.query(
-    'UPDATE schedules SET seats_remaining = \$1 WHERE id = \$2',
-    [currentSeats - 1, scheduleId],
-  );
+    if (avail == null) throw ArgumentError('Schedule not found');
 
-  final insertRow = await db.queryOne(
-    'SELECT id FROM bookings WHERE booking_ref = \$1',
-    [bookingRef],
-  );
+    final currentSeats = (avail[0] as num).toInt();
+    if (currentSeats <= 0 || currentSeats < uniqueSeatNumbers.length) {
+      throw StateError('No seats available for this schedule');
+    }
 
-  return {'id': insertRow![0] as int, 'booking_ref': bookingRef};
+    for (final seatNumber in uniqueSeatNumbers) {
+      final existingSeat = await db.queryOne(
+        "SELECT id FROM bookings WHERE schedule_id = \$1 AND seat_number = \$2 AND status = 'confirmed'",
+        [scheduleId, seatNumber],
+      );
+      if (existingSeat != null) {
+        throw StateError('Seat already booked: $seatNumber');
+      }
+    }
+
+    for (var i = 0; i < uniqueSeatNumbers.length; i++) {
+      final insertRow = await db.queryOne(
+        "INSERT INTO bookings (user_id, schedule_id, seat_number, contact_person, phone, total_price, booking_ref, status, payment_status) VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, 'confirmed', 'pending') RETURNING id",
+        [
+          userId,
+          scheduleId,
+          uniqueSeatNumbers[i],
+          safeContactPerson,
+          safePhone,
+          seatPrices[i],
+          bookingRef,
+        ],
+      );
+      insertedIds.add(insertRow![0] as int);
+    }
+
+    await db.query(
+      'UPDATE schedules SET seats_remaining = \$1 WHERE id = \$2',
+      [currentSeats - uniqueSeatNumbers.length, scheduleId],
+    );
+
+    await db.query('COMMIT');
+  } catch (_) {
+    await db.query('ROLLBACK');
+    rethrow;
+  }
+
+  return {
+    'id': insertedIds.first,
+    'ids': insertedIds,
+    'booking_ref': bookingRef,
+    'seat_numbers': uniqueSeatNumbers,
+    'contact_person': safeContactPerson,
+    'total_price': totalPrice,
+  };
 }
 
 Future<BookingSchema?> getBookingById(CaWilDatabase db, int id) async {
   final row = await db.queryOne(
-    'SELECT b.id, b.user_id, b.schedule_id, b.seat_number, b.passenger_name, '
-    'b.phone, b.total_price, b.booking_ref, b.qr_data, b.status, b.payment_status, '
+    'SELECT b.id, b.user_id, b.schedule_id, b.seat_number, b.contact_person, '
+    'b.phone, '
+    '(SELECT COALESCE(SUM(b2.total_price), 0) FROM bookings b2 '
+    'WHERE b2.booking_ref = b.booking_ref AND b2.status = b.status), '
+    'b.booking_ref, b.qr_data, b.status, b.payment_status, '
     'b.created_at, u.email, bs.bus_number, s.departure_time, s.origin, s.destination '
+    ", COALESCE((SELECT string_agg(b2.seat_number, ',' ORDER BY b2.seat_number) "
+    'FROM bookings b2 '
+    'WHERE b2.booking_ref = b.booking_ref AND b2.status = b.status), b.seat_number) '
     'FROM bookings b '
     'JOIN users u ON b.user_id = u.id '
     'JOIN schedules s ON b.schedule_id = s.id '
@@ -743,7 +811,7 @@ Future<BookingSchema?> getBookingById(CaWilDatabase db, int id) async {
 Future<bool> cancelBooking(CaWilDatabase db, int bookingId, int userId,
     {bool isAdmin = false}) async {
   final row = await db.queryOne(
-    'SELECT schedule_id, user_id FROM bookings WHERE id = \$1',
+    'SELECT schedule_id, user_id, booking_ref FROM bookings WHERE id = \$1',
     [bookingId],
   );
 
@@ -751,19 +819,28 @@ Future<bool> cancelBooking(CaWilDatabase db, int bookingId, int userId,
 
   final scheduleId = row[0] as int;
   final ownerId = row[1] as int;
+  final bookingRef = dbString(row[2], 'bookings.booking_ref');
   if (!isAdmin && ownerId != userId) {
     throw StateError('Only owner or admin can cancel this booking');
   }
 
-  await db.query(
-    "UPDATE bookings SET status = 'cancelled' WHERE id = \$1",
-    [bookingId],
+  final confirmedRows = await db.queryOne(
+    "SELECT COUNT(*) FROM bookings WHERE booking_ref = \$1 AND status = 'confirmed'",
+    [bookingRef],
   );
+  final confirmedSeatCount = (confirmedRows?[0] as num?)?.toInt() ?? 0;
 
   await db.query(
-    "UPDATE schedules SET seats_remaining = LEAST(seats_remaining + 1, 64) WHERE id = \$1 AND status = 'active'",
-    [scheduleId],
+    "UPDATE bookings SET status = 'cancelled' WHERE booking_ref = \$1 AND status = 'confirmed'",
+    [bookingRef],
   );
+
+  if (confirmedSeatCount > 0) {
+    await db.query(
+      "UPDATE schedules SET seats_remaining = LEAST(seats_remaining + \$1, 64) WHERE id = \$2 AND status = 'active'",
+      [confirmedSeatCount, scheduleId],
+    );
+  }
 
   return true;
 }
@@ -853,11 +930,11 @@ String generateBookingRef() {
   final mm = now.month.toString().padLeft(2, '0');
   final dd = now.day.toString().padLeft(2, '0');
 
-  final seed = now.millisecondsSinceEpoch & 0xFFFFF;
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  return 'CAW-$yy$mm$dd-'
-      '${chars[seed % chars.length]}'
-      '${chars[(seed ~/ chars.length) % chars.length]}'
-      '${chars[((seed * 3) ~/ chars.length) % chars.length]}'
-      '${chars[((seed * 7) ~/ 8) % chars.length]}';
+  final random = Random.secure();
+  final suffix = List.generate(
+    6,
+    (_) => chars[random.nextInt(chars.length)],
+  ).join();
+  return 'CAW-$yy$mm$dd-$suffix';
 }

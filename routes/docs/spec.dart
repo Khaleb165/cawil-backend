@@ -162,6 +162,11 @@ const openapiSpec = r'''
           "report_time": {"type": "string", "format": "date-time", "nullable": true},
           "price": {"type": "number"},
           "seats_remaining": {"type": "integer"},
+          "booked_seats": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Confirmed booked seat numbers for this schedule"
+          },
           "status": {"type": "string", "enum": ["active", "inactive", "departed"]}
         }
       },
@@ -203,8 +208,12 @@ const openapiSpec = r'''
           "id": {"type": "integer"},
           "user_id": {"type": "integer"},
           "schedule_id": {"type": "integer"},
-          "seat_number": {"type": "string"},
-          "passenger_name": {"type": "string"},
+          "seat_numbers": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Seat numbers included in this booking reference"
+          },
+          "contact_person": {"type": "string"},
           "phone": {"type": "string"},
           "total_price": {"type": "number"},
           "booking_ref": {"type": "string"},
@@ -222,11 +231,16 @@ const openapiSpec = r'''
       },
       "CreateBookingRequest": {
         "type": "object",
-        "required": ["schedule_id", "seat_number", "passenger_name", "phone", "total_price"],
+        "required": ["schedule_id", "seat_numbers", "contact_person", "phone", "total_price"],
         "properties": {
           "schedule_id": {"type": "integer"},
-          "seat_number": {"type": "string", "maxLength": 4},
-          "passenger_name": {"type": "string", "maxLength": 100},
+          "seat_numbers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "maxLength": 4}
+          },
+          "contact_person": {"type": "string", "maxLength": 100},
           "phone": {"type": "string", "maxLength": 20},
           "total_price": {"type": "number", "minimum": 0}
         }
@@ -235,6 +249,16 @@ const openapiSpec = r'''
         "type": "object",
         "properties": {
           "id": {"type": "integer"},
+          "ids": {
+            "type": "array",
+            "items": {"type": "integer"}
+          },
+          "seat_numbers": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "contact_person": {"type": "string"},
+          "total_price": {"type": "number"},
           "booking_ref": {"type": "string"}
         }
       },

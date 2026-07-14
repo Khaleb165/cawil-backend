@@ -13,8 +13,8 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   try {
-    final body = jsonDecode(await context.request.body())
-        as Map<String, dynamic>;
+    final body =
+        jsonDecode(await context.request.body()) as Map<String, dynamic>;
     final email = body['email'] as String?;
     final password = body['password'] as String?;
 
@@ -33,8 +33,7 @@ Future<Response> onRequest(RequestContext context) async {
       return jsonError(401, 'Invalid email or password');
     }
 
-    final jwtSecret =
-        Platform.environment['JWT_SECRET'] ?? 'dev-secret';
+    final jwtSecret = Platform.environment['JWT_SECRET'] ?? 'dev-secret';
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     final accessToken = generateJwt({

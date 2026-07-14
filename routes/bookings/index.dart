@@ -16,22 +16,25 @@ Future<Response> onRequest(RequestContext context) async {
   }
 
   try {
-    final body = jsonDecode(await context.request.body())
-        as Map<String, dynamic>;
+    final body =
+        jsonDecode(await context.request.body()) as Map<String, dynamic>;
     final scheduleId = body['schedule_id'] as int?;
-    final seatNumber = body['seat_number'] as String?;
-    final passengerName = body['passenger_name'] as String?;
-    final phone = body['phone'] as String?;
+    final seatNumbers = _parseSeatNumbers(body);
+    final contactPerson =
+        _optionalString(body['contact_person'] ?? body['passenger_name']);
+    final phone = _optionalString(body['phone']);
     final totalPrice = (body['total_price'] as num?)?.toDouble();
 
     if (scheduleId == null ||
-        seatNumber == null ||
-        passengerName == null ||
+        seatNumbers.isEmpty ||
+        contactPerson == null ||
+        contactPerson.trim().isEmpty ||
         phone == null ||
+        phone.trim().isEmpty ||
         totalPrice == null) {
       return jsonError(
         400,
-        'schedule_id, seat_number, passenger_name, phone, and total_price are required',
+        'schedule_id, seat_numbers, contact_person, phone, and total_price are required',
       );
     }
 
@@ -42,8 +45,8 @@ Future<Response> onRequest(RequestContext context) async {
       db,
       userId: userId,
       scheduleId: scheduleId,
-      seatNumber: seatNumber,
-      passengerName: passengerName,
+      seatNumbers: seatNumbers,
+      contactPerson: contactPerson,
       phone: phone,
       totalPrice: totalPrice,
     );
@@ -54,6 +57,9 @@ Future<Response> onRequest(RequestContext context) async {
     if (msg.contains('No seats available')) {
       return jsonError(409, msg);
     }
+    if (msg.contains('Seat already booked')) {
+      return jsonError(409, msg);
+    }
     if (msg.contains('Schedule not found')) {
       return jsonError(404, msg);
     }
@@ -61,11 +67,32 @@ Future<Response> onRequest(RequestContext context) async {
   }
 }
 
+String? _optionalString(Object? value) {
+  if (value == null) return null;
+  return value.toString();
+}
+
+List<String> _parseSeatNumbers(Map<String, dynamic> body) {
+  final seatNumbers = body['seat_numbers'];
+  if (seatNumbers is List) {
+    return seatNumbers
+        .map((seat) => seat.toString().trim())
+        .where((seat) => seat.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  final seatNumber = body['seat_number'];
+  if (seatNumber is String && seatNumber.trim().isNotEmpty) {
+    return [seatNumber.trim()];
+  }
+
+  return const [];
+}
+
 Map<String, dynamic>? _getAuthPayload(RequestContext context) {
   final authHeader = context.request.headers['authorization'];
   if (authHeader == null || !authHeader.startsWith('Bearer ')) return null;
   final token = authHeader.substring(7);
-  final secret =
-      Platform.environment['JWT_SECRET'] ?? 'dev-secret';
+  final secret = Platform.environment['JWT_SECRET'] ?? 'dev-secret';
   return verifyJwt(token, secret);
 }

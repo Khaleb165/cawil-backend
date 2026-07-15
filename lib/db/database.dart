@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:postgres/postgres.dart';
@@ -859,6 +860,164 @@ Future<void> updateBookingPdf(
     'UPDATE bookings SET qr_data = \$1 WHERE id = \$2',
     [pdfBytes, bookingId],
   );
+}
+
+Future<void> updateBookingGroupPdf(
+    CaWilDatabase db, String bookingRef, List<int> pdfBytes) async {
+  await db.query(
+    'UPDATE bookings SET qr_data = \$1 WHERE booking_ref = \$2',
+    [pdfBytes, bookingRef],
+  );
+}
+
+Future<Map<String, dynamic>?> getTicketByBookingId(
+  CaWilDatabase db,
+  int bookingId,
+) async {
+  final row = await db.queryOne(
+    'SELECT b.id, b.user_id, b.schedule_id, b.contact_person, b.phone, '
+    'b.booking_ref, b.status, b.payment_status, '
+    'COALESCE((SELECT string_agg(b2.seat_number, \',\' ORDER BY b2.seat_number) '
+    'FROM bookings b2 WHERE b2.booking_ref = b.booking_ref), b.seat_number), '
+    'COALESCE((SELECT SUM(b3.total_price) FROM bookings b3 '
+    'WHERE b3.booking_ref = b.booking_ref), b.total_price), '
+    's.origin, s.destination, s.departure_time, s.report_time, bs.bus_number, '
+    'COALESCE((SELECT p.currency FROM payments p '
+    'WHERE p.booking_ref = b.booking_ref ORDER BY p.created_at DESC LIMIT 1), \'GHS\'), '
+    'b.qr_data '
+    'FROM bookings b '
+    'JOIN schedules s ON b.schedule_id = s.id '
+    'JOIN buses bs ON s.bus_id = bs.id '
+    'WHERE b.id = \$1',
+    [bookingId],
+  );
+
+  if (row == null) return null;
+
+  return {
+    'id': (row[0] as num).toInt(),
+    'user_id': (row[1] as num).toInt(),
+    'schedule_id': (row[2] as num).toInt(),
+    'contact_person': dbString(row[3], 'bookings.contact_person'),
+    'phone': dbString(row[4], 'bookings.phone'),
+    'booking_ref': dbString(row[5], 'bookings.booking_ref'),
+    'status': dbString(row[6], 'bookings.status'),
+    'payment_status': dbString(row[7], 'bookings.payment_status'),
+    'seat_numbers': dbCommaSeparatedStrings(row[8], 'bookings.seat_number'),
+    'total_price': dbDouble(row[9], 'bookings.total_price').toStringAsFixed(2),
+    'origin': dbString(row[10], 'schedules.origin'),
+    'destination': dbString(row[11], 'schedules.destination'),
+    'departure_time': (row[12] as DateTime).toLocal().toString(),
+    'report_time':
+        row[13] == null ? 'N/A' : (row[13] as DateTime).toLocal().toString(),
+    'bus_number': dbString(row[14], 'buses.bus_number'),
+    'currency': dbString(row[15], 'payments.currency'),
+    'qr_data': row[16] is List<int> ? row[16] as List<int> : <int>[],
+  };
+}
+
+// ====================================================================
+// PAYMENTS
+// ====================================================================
+
+const _paymentColumns = 'id, user_id, booking_ref, provider, '
+    'provider_reference, amount, currency, status, authorization_url, '
+    'access_code, channel, gateway_response, paid_at, created_at, updated_at';
+
+Future<PaymentSchema> createPayment(
+  CaWilDatabase db, {
+  required int userId,
+  required String bookingRef,
+  required String providerReference,
+  required double amount,
+  required String currency,
+  String? authorizationUrl,
+  String? accessCode,
+  Map<String, dynamic>? providerPayload,
+}) async {
+  final row = await db.queryOne(
+    'INSERT INTO payments (user_id, booking_ref, provider_reference, amount, '
+    'currency, authorization_url, access_code, provider_payload) '
+    'VALUES (\$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8::jsonb) '
+    'RETURNING $_paymentColumns',
+    [
+      userId,
+      bookingRef,
+      providerReference,
+      amount,
+      currency.toUpperCase(),
+      authorizationUrl,
+      accessCode,
+      jsonEncode(providerPayload ?? const <String, dynamic>{}),
+    ],
+  );
+
+  if (row == null) throw StateError('Failed to create payment');
+  return PaymentSchema.fromRow(row);
+}
+
+Future<PaymentSchema?> getPaymentByReference(
+  CaWilDatabase db,
+  String providerReference,
+) async {
+  final row = await db.queryOne(
+    'SELECT $_paymentColumns FROM payments WHERE provider_reference = \$1',
+    [providerReference],
+  );
+  if (row == null) return null;
+  return PaymentSchema.fromRow(row);
+}
+
+Future<PaymentSchema> updatePaymentFromProvider(
+  CaWilDatabase db, {
+  required String providerReference,
+  required String status,
+  required Map<String, dynamic> providerPayload,
+  String? channel,
+  String? gatewayResponse,
+  DateTime? paidAt,
+}) async {
+  final normalizedStatus = _normalizePaymentStatus(status);
+  final row = await db.queryOne(
+    'UPDATE payments SET status = \$2, channel = \$3, gateway_response = \$4, '
+    'paid_at = \$5, provider_payload = \$6::jsonb, updated_at = now() '
+    'WHERE provider_reference = \$1 '
+    'RETURNING $_paymentColumns',
+    [
+      providerReference,
+      normalizedStatus,
+      channel,
+      gatewayResponse,
+      paidAt?.toUtc(),
+      jsonEncode(providerPayload),
+    ],
+  );
+
+  if (row == null) throw ArgumentError('Payment not found');
+  final payment = PaymentSchema.fromRow(row);
+
+  await db.query(
+    'UPDATE bookings SET payment_status = \$1 WHERE booking_ref = \$2',
+    [payment.status, payment.bookingRef],
+  );
+
+  return payment;
+}
+
+String _normalizePaymentStatus(String status) {
+  switch (status.toLowerCase()) {
+    case 'success':
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'abandoned':
+      return 'abandoned';
+    case 'refunded':
+      return 'refunded';
+    default:
+      return 'pending';
+  }
 }
 
 // ====================================================================

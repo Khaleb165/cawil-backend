@@ -299,6 +299,79 @@ class BookingSchema {
       };
 }
 
+class PaymentSchema {
+  final int id;
+  final int userId;
+  final String bookingRef;
+  final String provider;
+  final String providerReference;
+  final double amount;
+  final String currency;
+  final String status;
+  final String? authorizationUrl;
+  final String? accessCode;
+  final String? channel;
+  final String? gatewayResponse;
+  final DateTime? paidAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const PaymentSchema({
+    required this.id,
+    required this.userId,
+    required this.bookingRef,
+    required this.provider,
+    required this.providerReference,
+    required this.amount,
+    required this.currency,
+    required this.status,
+    this.authorizationUrl,
+    this.accessCode,
+    this.channel,
+    this.gatewayResponse,
+    this.paidAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory PaymentSchema.fromRow(List<Object?> row) => PaymentSchema(
+        id: (row[0] as num).toInt(),
+        userId: (row[1] as num).toInt(),
+        bookingRef: dbString(row[2], 'payments.booking_ref'),
+        provider: dbString(row[3], 'payments.provider'),
+        providerReference: dbString(row[4], 'payments.provider_reference'),
+        amount: dbDouble(row[5], 'payments.amount'),
+        currency: dbString(row[6], 'payments.currency'),
+        status: dbString(row[7], 'payments.status'),
+        authorizationUrl:
+            dbNullableString(row[8], 'payments.authorization_url'),
+        accessCode: dbNullableString(row[9], 'payments.access_code'),
+        channel: dbNullableString(row[10], 'payments.channel'),
+        gatewayResponse: dbNullableString(row[11], 'payments.gateway_response'),
+        paidAt: row[12] == null ? null : (row[12] as DateTime).toUtc(),
+        createdAt: (row[13] as DateTime).toUtc(),
+        updatedAt: (row[14] as DateTime).toUtc(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'user_id': userId,
+        'booking_ref': bookingRef,
+        'provider': provider,
+        'provider_reference': providerReference,
+        'amount': amount,
+        'currency': currency,
+        'status': status,
+        'authorization_url': authorizationUrl,
+        'access_code': accessCode,
+        'channel': channel,
+        'gateway_response': gatewayResponse,
+        'paid_at': paidAt?.toUtc().toIso8601String(),
+        'created_at': createdAt.toUtc().toIso8601String(),
+        'updated_at': updatedAt.toUtc().toIso8601String(),
+      };
+}
+
 class RefreshTokenSchema {
   final int id;
   final int userId;

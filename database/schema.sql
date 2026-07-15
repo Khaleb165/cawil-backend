@@ -133,6 +133,8 @@ end $$;
 -- ============================================
 do $$ begin create type booking_status as enum ('confirmed', 'cancelled', 'no_show'); exception when duplicate_object then null; end $$;
 do $$ begin create type paymentstatus as enum ('pending', 'completed', 'refunded'); exception when duplicate_object then null; end $$;
+do $$ begin alter type paymentstatus add value 'failed'; exception when duplicate_object then null; end $$;
+do $$ begin alter type paymentstatus add value 'abandoned'; exception when duplicate_object then null; end $$;
 
 create table if not exists bookings (
     id                serial primary key,
@@ -182,7 +184,34 @@ on bookings(schedule_id, seat_number)
 where status = 'confirmed';
 
 -- ============================================
--- Schema 6: refresh_tokens (single-use JWT refresh)
+-- Schema 6: payments — Paystack transaction tracking
+-- ============================================
+do $$ begin create type payment_provider as enum ('paystack'); exception when duplicate_object then null; end $$;
+
+create table if not exists payments (
+    id                    serial primary key,
+    user_id               int not null references users(id) on delete cascade,
+    booking_ref           varchar not null,
+    provider              payment_provider not null default 'paystack',
+    provider_reference    varchar unique not null check(length(provider_reference) > 0 and length(provider_reference) <= 80),
+    amount                decimal(10,2) not null check(amount >= 0),
+    currency              varchar not null default 'GHS' check(length(currency) = 3),
+    status                paymentstatus not null default 'pending',
+    authorization_url     text,
+    access_code           varchar,
+    channel               varchar,
+    gateway_response      text,
+    provider_payload      jsonb,
+    paid_at               timestamptz,
+    created_at            timestamptz default now(),
+    updated_at            timestamptz default now()
+);
+
+create index if not exists payments_booking_ref_index on payments(booking_ref);
+create index if not exists payments_user_id_index on payments(user_id);
+
+-- ============================================
+-- Schema 7: refresh_tokens (single-use JWT refresh)
 -- ============================================
 create table if not exists refresh_tokens (
     id           serial primary key,
@@ -194,7 +223,7 @@ create table if not exists refresh_tokens (
 );
 
 -- ============================================
--- Schema 7: admin_logs (audit trail)
+-- Schema 8: admin_logs (audit trail)
 -- ============================================
 create table if not exists admin_logs (
     id           serial primary key,

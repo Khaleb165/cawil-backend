@@ -9,9 +9,12 @@ import 'package:dart_frog/dart_frog.dart';
 import '../routes/index.dart' as index;
 import '../routes/schedules/index.dart' as schedules_index;
 import '../routes/schedules/[id].dart' as schedules_$id;
+import '../routes/payments/index.dart' as payments_index;
+import '../routes/payments/verify/index.dart' as payments_verify_index;
 import '../routes/docs/spec.dart' as docs_spec;
 import '../routes/docs/index.dart' as docs_index;
 import '../routes/bookings/index.dart' as bookings_index;
+import '../routes/bookings/[id]/ticket.pdf.dart' as bookings_$id_ticket_pdf;
 import '../routes/bookings/[id]/index.dart' as bookings_$id_index;
 import '../routes/auth/register.dart' as auth_register;
 import '../routes/auth/refresh.dart' as auth_refresh;
@@ -42,6 +45,8 @@ Handler buildRootHandler() {
   final router = Router()
     ..mount('/', (context) => buildHandler()(context))
     ..mount('/schedules', (context) => buildSchedulesHandler()(context))
+    ..mount('/payments', (context) => buildPaymentsHandler()(context))
+    ..mount('/payments/verify', (context) => buildPaymentsVerifyHandler()(context))
     ..mount('/docs', (context) => buildDocsHandler()(context))
     ..mount('/bookings', (context) => buildBookingsHandler()(context))
     ..mount('/bookings/<id>', (context,id,) => buildBookings$idHandler(id,)(context))
@@ -66,6 +71,20 @@ Handler buildSchedulesHandler() {
   return pipeline.addHandler(router);
 }
 
+Handler buildPaymentsHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/', (context) => payments_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
+Handler buildPaymentsVerifyHandler() {
+  final pipeline = const Pipeline();
+  final router = Router()
+    ..all('/', (context) => payments_verify_index.onRequest(context,));
+  return pipeline.addHandler(router);
+}
+
 Handler buildDocsHandler() {
   final pipeline = const Pipeline();
   final router = Router()
@@ -83,7 +102,7 @@ Handler buildBookingsHandler() {
 Handler buildBookings$idHandler(String id,) {
   final pipeline = const Pipeline();
   final router = Router()
-    ..all('/', (context) => bookings_$id_index.onRequest(context,id,));
+    ..all('/ticket.pdf', (context) => bookings_$id_ticket_pdf.onRequest(context,id,))..all('/', (context) => bookings_$id_index.onRequest(context,id,));
   return pipeline.addHandler(router);
 }
 

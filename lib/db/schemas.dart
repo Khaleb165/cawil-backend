@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:postgres/postgres.dart';
 
 String dbString(Object? value, String fieldName) {
@@ -38,6 +40,18 @@ List<String> dbCommaSeparatedStrings(Object? value, String fieldName) {
       .map((item) => item.trim())
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
+}
+
+List<int> dbBytes(Object? value, String fieldName) {
+  if (value == null) return const [];
+  if (value is Uint8List) return value.toList(growable: false);
+  if (value is List<int>) return List<int>.from(value, growable: false);
+  if (value is UndecodedBytes) {
+    return value.bytes.toList(growable: false);
+  }
+  throw StateError(
+    'Expected $fieldName to be bytes, got ${value.runtimeType}',
+  );
 }
 
 class UserSchema {

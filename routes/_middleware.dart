@@ -13,10 +13,9 @@ Handler middleware(Handler handler) {
     }
 
     final response = await handler(context);
-    final body = await response.body();
-    return Response(
+    return Response.stream(
       statusCode: response.statusCode,
-      body: body,
+      body: response.bytes(),
       headers: {
         ...response.headers,
         ..._corsHeaders,

@@ -218,7 +218,7 @@ const openapiSpec = r'''
           "total_price": {"type": "number"},
           "booking_ref": {"type": "string"},
           "status": {"type": "string", "enum": ["confirmed", "cancelled", "no_show"]},
-          "payment_status": {"type": "string", "enum": ["pending", "completed", "refunded"]}
+          "payment_status": {"type": "string", "enum": ["pending", "completed", "failed", "abandoned", "refunded"]}
         }
       },
       "BookingWithDetails": {
@@ -260,6 +260,64 @@ const openapiSpec = r'''
           "contact_person": {"type": "string"},
           "total_price": {"type": "number"},
           "booking_ref": {"type": "string"}
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "user_id": {"type": "integer"},
+          "booking_ref": {"type": "string"},
+          "provider": {"type": "string", "enum": ["paystack"]},
+          "provider_reference": {"type": "string"},
+          "amount": {"type": "number"},
+          "currency": {"type": "string"},
+          "status": {"type": "string", "enum": ["pending", "completed", "failed", "abandoned", "refunded"]},
+          "authorization_url": {"type": "string", "nullable": true},
+          "access_code": {"type": "string", "nullable": true},
+          "channel": {"type": "string", "nullable": true},
+          "gateway_response": {"type": "string", "nullable": true},
+          "paid_at": {"type": "string", "format": "date-time", "nullable": true}
+        }
+      },
+      "InitializePaymentRequest": {
+        "type": "object",
+        "required": ["schedule_id", "seat_numbers", "contact_person", "phone"],
+        "properties": {
+          "schedule_id": {"type": "integer"},
+          "seat_numbers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "maxLength": 4}
+          },
+          "contact_person": {"type": "string", "maxLength": 100},
+          "phone": {"type": "string", "maxLength": 20},
+          "payment_method": {"type": "string", "description": "Optional UI hint used to prefer card or mobile_money channels"}
+        }
+      },
+      "InitializePaymentResponse": {
+        "type": "object",
+        "properties": {
+          "booking": {"$ref": "#/components/schemas/CreateBookingResponse"},
+          "payment": {"$ref": "#/components/schemas/Payment"},
+          "authorization_url": {"type": "string"},
+          "access_code": {"type": "string"},
+          "reference": {"type": "string"}
+        }
+      },
+      "VerifyPaymentRequest": {
+        "type": "object",
+        "required": ["reference"],
+        "properties": {
+          "reference": {"type": "string"}
+        }
+      },
+      "VerifyPaymentResponse": {
+        "type": "object",
+        "properties": {
+          "payment": {"$ref": "#/components/schemas/Payment"},
+          "paystack_status": {"type": "string"}
         }
       },
       "StatusResponse": {
@@ -315,10 +373,47 @@ const openapiSpec = r'''
         "content": {
           "application/json": {
             "schema": {"$ref": "#/components/schemas/Error"}
+      }
+    },
+    "/bookings/{id}/ticket.pdf": {
+      "get": {
+        "summary": "Download paid booking ticket PDF with QR code",
+        "operationId": "downloadTicketPdf",
+        "tags": ["Bookings"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF ticket",
+            "content": {
+              "application/pdf": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {
+            "description": "Ticket is available after payment is completed",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
           }
         }
       }
     }
+  }
+}
   },
   "paths": {
     "/": {
@@ -882,6 +977,81 @@ const openapiSpec = r'''
           "401": {"$ref": "#/components/responses/Unauthorized"},
           "403": {"$ref": "#/components/responses/Forbidden"},
           "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/payments": {
+      "post": {
+        "summary": "Create booking and initialize Paystack payment",
+        "operationId": "initializePayment",
+        "tags": ["Payments"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/InitializePaymentRequest"}
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment initialized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/InitializePaymentResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {
+            "description": "Seat is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/payments/verify": {
+      "post": {
+        "summary": "Verify Paystack payment and update booking payment status",
+        "operationId": "verifyPayment",
+        "tags": ["Payments"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/VerifyPaymentRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment verification result",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/VerifyPaymentResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {
+            "description": "Payment amount or currency mismatch",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
         }
       }
     },

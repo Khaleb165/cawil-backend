@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:postgres/postgres.dart';
 import 'schemas.dart';
 export 'schemas.dart';
@@ -851,14 +852,14 @@ Future<List<int>?> getBookingPdf(CaWilDatabase db, int bookingId) async {
     'SELECT qr_data FROM bookings WHERE id = \$1',
     [bookingId],
   );
-  return row == null ? null : row[0] as List<int>;
+  return row == null ? null : dbBytes(row[0], 'bookings.qr_data');
 }
 
 Future<void> updateBookingPdf(
     CaWilDatabase db, int bookingId, List<int> pdfBytes) async {
   await db.query(
     'UPDATE bookings SET qr_data = \$1 WHERE id = \$2',
-    [pdfBytes, bookingId],
+    [TypedValue(Type.byteArray, Uint8List.fromList(pdfBytes)), bookingId],
   );
 }
 
@@ -866,7 +867,7 @@ Future<void> updateBookingGroupPdf(
     CaWilDatabase db, String bookingRef, List<int> pdfBytes) async {
   await db.query(
     'UPDATE bookings SET qr_data = \$1 WHERE booking_ref = \$2',
-    [pdfBytes, bookingRef],
+    [TypedValue(Type.byteArray, Uint8List.fromList(pdfBytes)), bookingRef],
   );
 }
 
@@ -912,7 +913,7 @@ Future<Map<String, dynamic>?> getTicketByBookingId(
         row[13] == null ? 'N/A' : (row[13] as DateTime).toLocal().toString(),
     'bus_number': dbString(row[14], 'buses.bus_number'),
     'currency': dbString(row[15], 'payments.currency'),
-    'qr_data': row[16] is List<int> ? row[16] as List<int> : <int>[],
+    'qr_data': dbBytes(row[16], 'bookings.qr_data'),
   };
 }
 

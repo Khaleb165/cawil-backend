@@ -95,7 +95,7 @@ const openapiSpec = r'''
           "reset_token": {
             "type": "string",
             "nullable": true,
-            "description": "Returned only when RETURN_PASSWORD_RESET_TOKEN is not false. Use email delivery in production."
+            "description": "Returned only when RETURN_PASSWORD_RESET_TOKEN=true for development testing. Production sends the token by email."
           }
         }
       },

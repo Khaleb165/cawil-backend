@@ -223,7 +223,22 @@ create table if not exists refresh_tokens (
 );
 
 -- ============================================
--- Schema 8: admin_logs (audit trail)
+-- Schema 8: password_reset_tokens (one-time password resets)
+-- ============================================
+create table if not exists password_reset_tokens (
+    id           serial primary key,
+    user_id      int not null references users(id) on delete cascade,
+    token_hash   varchar unique not null check(length(token_hash) = 64),
+    expires_at   timestamptz not null,
+    used_at      timestamptz default null,
+    created_at   timestamptz default now()
+);
+
+create index if not exists password_reset_tokens_user_id_index
+on password_reset_tokens(user_id);
+
+-- ============================================
+-- Schema 9: admin_logs (audit trail)
 -- ============================================
 create table if not exists admin_logs (
     id           serial primary key,

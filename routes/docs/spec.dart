@@ -107,6 +107,14 @@ const openapiSpec = r'''
           "password": {"type": "string", "minLength": 6}
         }
       },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": ["current_password", "new_password"],
+        "properties": {
+          "current_password": {"type": "string"},
+          "new_password": {"type": "string", "minLength": 6}
+        }
+      },
       "MessageResponse": {
         "type": "object",
         "properties": {
@@ -405,47 +413,10 @@ const openapiSpec = r'''
         "content": {
           "application/json": {
             "schema": {"$ref": "#/components/schemas/Error"}
-      }
-    },
-    "/bookings/{id}/ticket.pdf": {
-      "get": {
-        "summary": "Download paid booking ticket PDF with QR code",
-        "operationId": "downloadTicketPdf",
-        "tags": ["Bookings"],
-        "security": [{"bearerAuth": []}],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {"type": "integer"}
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "PDF ticket",
-            "content": {
-              "application/pdf": {
-                "schema": {"type": "string", "format": "binary"}
-              }
-            }
-          },
-          "401": {"$ref": "#/components/responses/Unauthorized"},
-          "403": {"$ref": "#/components/responses/Forbidden"},
-          "404": {"$ref": "#/components/responses/NotFound"},
-          "409": {
-            "description": "Ticket is available after payment is completed",
-            "content": {
-              "application/json": {
-                "schema": {"$ref": "#/components/schemas/Error"}
-              }
-            }
           }
         }
       }
     }
-  }
-}
   },
   "paths": {
     "/": {
@@ -568,6 +539,35 @@ const openapiSpec = r'''
           },
           "400": {"$ref": "#/components/responses/ValidationError"},
           "401": {"$ref": "#/components/responses/Unauthorized"}
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "summary": "Change password for the authenticated user",
+        "operationId": "changePassword",
+        "tags": ["Authentication"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ChangePasswordRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/MessageResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"}
         }
       }
     },
@@ -1243,6 +1243,43 @@ const openapiSpec = r'''
             }
           },
           "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/bookings/{id}/ticket.pdf": {
+      "get": {
+        "summary": "Download paid booking ticket PDF with QR code",
+        "operationId": "downloadTicketPdf",
+        "tags": ["Bookings"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF ticket",
+            "content": {
+              "application/pdf": {
+                "schema": {"type": "string", "format": "binary"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {
+            "description": "Ticket is available after payment is completed",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+              }
+            }
+          }
         }
       }
     }

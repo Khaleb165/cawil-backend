@@ -22,6 +22,7 @@ import '../routes/auth/refresh.dart' as auth_refresh;
 import '../routes/auth/me.dart' as auth_me;
 import '../routes/auth/login.dart' as auth_login;
 import '../routes/auth/forgot-password.dart' as auth_forgot_password;
+import '../routes/auth/change-password.dart' as auth_change_password;
 import '../routes/admin/schedules/index.dart' as admin_schedules_index;
 import '../routes/admin/route-defs/index.dart' as admin_route_defs_index;
 import '../routes/admin/route-defs/[id].dart' as admin_route_defs_$id;
@@ -111,7 +112,7 @@ Handler buildBookings$idHandler(String id,) {
 Handler buildAuthHandler() {
   final pipeline = const Pipeline();
   final router = Router()
-    ..all('/forgot-password', (context) => auth_forgot_password.onRequest(context,))..all('/login', (context) => auth_login.onRequest(context,))..all('/me', (context) => auth_me.onRequest(context,))..all('/refresh', (context) => auth_refresh.onRequest(context,))..all('/register', (context) => auth_register.onRequest(context,))..all('/reset-password', (context) => auth_reset_password.onRequest(context,));
+    ..all('/change-password', (context) => auth_change_password.onRequest(context,))..all('/forgot-password', (context) => auth_forgot_password.onRequest(context,))..all('/login', (context) => auth_login.onRequest(context,))..all('/me', (context) => auth_me.onRequest(context,))..all('/refresh', (context) => auth_refresh.onRequest(context,))..all('/register', (context) => auth_register.onRequest(context,))..all('/reset-password', (context) => auth_reset_password.onRequest(context,));
   return pipeline.addHandler(router);
 }
 

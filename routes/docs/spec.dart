@@ -81,6 +81,38 @@ const openapiSpec = r'''
           "refresh_token": {"type": "string"}
         }
       },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": {"type": "string", "format": "email"}
+        }
+      },
+      "ForgotPasswordResponse": {
+        "type": "object",
+        "properties": {
+          "message": {"type": "string"},
+          "reset_token": {
+            "type": "string",
+            "nullable": true,
+            "description": "Returned only when RETURN_PASSWORD_RESET_TOKEN is not false. Use email delivery in production."
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": ["token", "password"],
+        "properties": {
+          "token": {"type": "string"},
+          "password": {"type": "string", "minLength": 6}
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": {"type": "string"}
+        }
+      },
       "UpdateProfileRequest": {
         "type": "object",
         "properties": {
@@ -433,6 +465,32 @@ const openapiSpec = r'''
         }
       }
     },
+    "/auth/forgot-password": {
+      "post": {
+        "summary": "Create a password reset token",
+        "operationId": "forgotPassword",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ForgotPasswordRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset token created when the email exists",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ForgotPasswordResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"}
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "summary": "Register a new user account",
@@ -483,6 +541,33 @@ const openapiSpec = r'''
               }
             }
           }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "summary": "Reset password with a one-time token",
+        "operationId": "resetPassword",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ResetPasswordRequest"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/MessageResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/ValidationError"},
+          "401": {"$ref": "#/components/responses/Unauthorized"}
         }
       }
     },

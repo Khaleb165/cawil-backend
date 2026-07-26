@@ -339,7 +339,7 @@ Future<void> updateUser(
   String? avatarUrl,
 }) async {
   final parts = <String>[];
-  final params = <Object>[userId];
+  final params = <Object>[];
   var idx = 1;
 
   if (username != null && username.trim().isNotEmpty) {
@@ -357,8 +357,9 @@ Future<void> updateUser(
   if (parts.isEmpty) return;
 
   parts.add('updated_at = now()');
+  params.add(userId);
   await db.query(
-    'UPDATE users SET ${parts.join(', ')} WHERE id = \$1',
+    'UPDATE users SET ${parts.join(', ')} WHERE id = \$$idx',
     params,
   );
 }

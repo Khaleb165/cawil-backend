@@ -16,10 +16,12 @@ import '../routes/docs/index.dart' as docs_index;
 import '../routes/bookings/index.dart' as bookings_index;
 import '../routes/bookings/[id]/ticket.pdf.dart' as bookings_$id_ticket_pdf;
 import '../routes/bookings/[id]/index.dart' as bookings_$id_index;
+import '../routes/auth/reset-password.dart' as auth_reset_password;
 import '../routes/auth/register.dart' as auth_register;
 import '../routes/auth/refresh.dart' as auth_refresh;
 import '../routes/auth/me.dart' as auth_me;
 import '../routes/auth/login.dart' as auth_login;
+import '../routes/auth/forgot-password.dart' as auth_forgot_password;
 import '../routes/admin/schedules/index.dart' as admin_schedules_index;
 import '../routes/admin/route-defs/index.dart' as admin_route_defs_index;
 import '../routes/admin/route-defs/[id].dart' as admin_route_defs_$id;
@@ -109,7 +111,7 @@ Handler buildBookings$idHandler(String id,) {
 Handler buildAuthHandler() {
   final pipeline = const Pipeline();
   final router = Router()
-    ..all('/login', (context) => auth_login.onRequest(context,))..all('/me', (context) => auth_me.onRequest(context,))..all('/refresh', (context) => auth_refresh.onRequest(context,))..all('/register', (context) => auth_register.onRequest(context,));
+    ..all('/forgot-password', (context) => auth_forgot_password.onRequest(context,))..all('/login', (context) => auth_login.onRequest(context,))..all('/me', (context) => auth_me.onRequest(context,))..all('/refresh', (context) => auth_refresh.onRequest(context,))..all('/register', (context) => auth_register.onRequest(context,))..all('/reset-password', (context) => auth_reset_password.onRequest(context,));
   return pipeline.addHandler(router);
 }
 

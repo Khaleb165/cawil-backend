@@ -1063,6 +1063,64 @@ Future<void> revokeRefreshToken(CaWilDatabase db, String jti) async {
   );
 }
 
+Future<void> revokeRefreshTokensForUser(CaWilDatabase db, int userId) async {
+  await db.query(
+    'UPDATE refresh_tokens SET revoked_at = now() WHERE user_id = \$1 AND revoked_at IS NULL',
+    [userId],
+  );
+}
+
+// ====================================================================
+// PASSWORD RESET TOKENS
+// ====================================================================
+
+Future<void> createPasswordResetToken(
+  CaWilDatabase db, {
+  required int userId,
+  required String tokenHash,
+  required DateTime expiresAt,
+}) async {
+  await db.query(
+    'UPDATE password_reset_tokens SET used_at = now() WHERE user_id = \$1 AND used_at IS NULL',
+    [userId],
+  );
+
+  await db.query(
+    'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (\$1, \$2, \$3)',
+    [userId, tokenHash, expiresAt.toUtc()],
+  );
+}
+
+Future<int?> getValidPasswordResetUserId(
+  CaWilDatabase db,
+  String tokenHash,
+) async {
+  final row = await db.queryOne(
+    'SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = \$1',
+    [tokenHash],
+  );
+
+  if (row == null || row[3] != null) return null;
+
+  final expiresAt = row[2] as DateTime;
+  if (expiresAt.isBefore(DateTime.now())) {
+    await markPasswordResetTokenUsed(db, tokenHash);
+    return null;
+  }
+
+  return (row[1] as num).toInt();
+}
+
+Future<void> markPasswordResetTokenUsed(
+  CaWilDatabase db,
+  String tokenHash,
+) async {
+  await db.query(
+    'UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = \$1 AND used_at IS NULL',
+    [tokenHash],
+  );
+}
+
 // ====================================================================
 // ADMIN LOGS
 // ====================================================================
